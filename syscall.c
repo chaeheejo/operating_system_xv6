@@ -103,6 +103,8 @@ extern int sys_unlink(void);
 extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
+extern int sys_memsize(void);
+extern int sys_trace(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -126,6 +128,14 @@ static int (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_memsize] sys_memsize,
+[SYS_trace]   sys_trace,
+};
+
+static char* syscall_name[23] = {
+"fork", "exit", "wait", "pipe", "read", "kill", "exec", "fstat",
+"chdir", "dup", "getpid", "sbrk", "sleep", "uptime", "open", "write",
+"mknod", "unlink", "link", "mkdir", "close", "memsize", "trace"
 };
 
 void
@@ -142,4 +152,9 @@ syscall(void)
             curproc->pid, curproc->name, num);
     curproc->tf->eax = -1;
   }
+
+  if(curproc->trace_mask & (1<<num)) {
+      cprintf("syscall traced: pid = %d, syscall = %s, %d returned\n",
+              curproc->pid, syscall_name[num-1], curproc->tf->eax);
+    }
 }
