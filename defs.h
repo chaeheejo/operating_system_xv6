@@ -120,6 +120,7 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+void 		do_weightset(int); //proc.c에 있는 do_weightset을 sysproc.c에서 사용할 수 있도록 선언해준다.
 
 // swtch.S
 void            swtch(struct context**, struct context*);

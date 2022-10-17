@@ -91,24 +91,20 @@ sys_uptime(void)
 }
 
 int
-sys_memsize(void)
+sys_weightset(void) //프로세스의 weight 값을 설정하는 시스템 콜
 {
-  uint size;
-
-  size = myproc()->sz;
-
-  return size;
-}
-
-int
-sys_trace(void)
-{
-  int mask;
+  int weight;
   
-  if(argint(0, &mask)<0){
+  //매개변수로 전달받은 weight 값을 읽어온 뒤
+  if(argint(0, &weight)<0){
     return -1;
   }
-
-  myproc()->trace_mask = mask;
+  //0보다 작거나 같으면 에러 처리를 해준다.
+  if(weight<=0){
+    return -1;
+  }
+   
+  //proc.c 파일에 구현한 do_weightset 함수를 호출해 weight 값을 현재 프로세스의 weight에 할당해준다.
+  do_weightset(weight);
   return 0;
 }

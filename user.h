@@ -23,8 +23,7 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-int memsize(void);
-int trace(int);
+int weightset(int); //사용자가 시스템 콜을 사용할 수 있도록 함수 헤더를 선언한다.
 
 // ulib.c
 int stat(const char*, struct stat*);

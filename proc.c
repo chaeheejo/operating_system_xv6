@@ -7,18 +7,108 @@
 #include "proc.h"
 #include "spinlock.h"
 
+#define TIME_SLICE 10000000
+#define NULL ((void *)0)
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
+  //ptable 내의 RUNNABLE 상태의 프로세스의 priority 값 중 가장 작은 값을 저장한다.
+  long lowest_priority; 
 } ptable;
 
 static struct proc *initproc;
+
+//프로세스의 weight 값을 할당하기 위한 변수이다.
+uint weight=1;
 
 int nextpid = 1;
 extern void forkret(void);
 extern void trapret(void);
 
 static void wakeup1(void *chan);
+
+//다음 실행할 프로세스를 선택하는 함수이다.
+struct proc *ssu_schedule()
+{
+  struct proc *p;
+  struct proc *ret = NULL;
+
+  //for문을 통해 현재 ptable에 존재하는 프로세스들을 확인한다.
+  for(p=ptable.proc ; p<&ptable.proc[NPROC] ; p++){
+    //RUNNABLE 상태인 프로세스 중 priority 값이 가장 작은 프로세스를 실행할 것이다.
+    //ptable에 존재하는 프로세스들 중 RUNNABLE 상태인 프로세스이면,
+    if(p->state==RUNNABLE){
+      //return 할 프로세스와 priority 값을 비교한다.
+      //return 할 프로세스가 아직 없거나, 현재 프로세스의 priority 값이 return할 프로세스의 priority 값보다 작으면,
+      if((ret==NULL) || (ret->priority > p->priority)){
+        //return 프로세스를 현재 프로세스로 바꿔준다.
+        ret=p;
+       }
+    }
+  }
+
+  //만약 실행 시 DEBUG 값이 설정되어 들어오면, 프로세스의 정보를 출력한다.
+  #ifdef DEBUG
+  if(ret)
+    //ret가 NULL이 아니라면, 프로세스의 id, 이름, weight 값, priority 값을 출력한다.
+    cprintf("PID: %d, NAME: %s, WEIGHT: %d, PRIORITY: %d\n", ret->pid, ret->name, ret->weight, ret->priority);
+  
+  #endif
+  
+  //ptable을 모두 돌면서 가장 작은 priority 값을 가진 프로세스를 선택한 후 이를 return 해준다.
+  return ret;
+}
+
+//전달받은 프로세스의 priority를 업데이트해준다.
+void update_priority(struct proc *p)
+{
+  //new_priority = old_priority + (time_slice / weight) 규칙에 따라 priority 값을 업데이트해준다.
+  p->priority = p->priority +(TIME_SLICE/p->weight); 
+}
+
+//ptable을 순회하면서 가장 낮은 priority 값을 찾아 ptable의 lowest_priority 변수에 저장한다.
+void update_lowest_priority()
+{
+  struct proc *min =NULL;
+  struct proc *p;
+  
+  //for문을 통해 현재 ptable에 존재하는 프로세스들을 확인한다.
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    //RUNNABLE 상태인 프로세스들의 priority 값을 확인한다.
+    //ptable에 존재하는 프로세스들 중 RUNNABLE 상태인 프로세스이면,
+      if(p->state == RUNNABLE){
+        //설정할 프로세스의 priority 값과 비교한다.
+        //설정할 프로세스가 아직 없거나, 현재 프로세스의 priority 값이 설정할 프로세스의 priority 값보다 작으면,
+	      if((min==NULL)||(min->priority > p->priority))
+          //설정할 프로세스를 현재 프로세스로 업데이트해준다.
+	        min=p;
+      }
+  }
+
+  //ptable을 순회하면서 찾은 가장 작은 priority 값을 
+  if(min!=NULL)
+    //ptable의 lowest_priority 변수에 저장한다.
+	  ptable.lowest_priority = min->priority;
+}
+
+//전달받은 프로세스의 priority 값을 ptable의 lowest_priority 변수에 저장해준다.
+void assign_lowest_priority(struct proc *p)
+{
+  p->priority = ptable.lowest_priority;
+}
+
+//전달받은 weight 값으로 현재 접근하고 있는 프로세스의 weight 값을 업데이트해주는 함수이다.
+//sysproc.c 파일의 sys_weightset
+void do_weightset(int weight)
+{
+  //현재 접근하고 있는 프로세스의 proc 구조체 변수의 값을 변경하는 것이므로
+  //ptable을 lock해준 뒤 값을 변경해야 한다.
+  acquire(&ptable.lock);
+  //매개변수로 전달받은 weight 값을 현재 접근하고 있는 프로세스의 weight 값으로 할당해준다.
+  myproc()->weight = weight;
+  release(&ptable.lock);
+} 
 
 void
 pinit(void)
@@ -89,6 +179,16 @@ found:
   p->state = EMBRYO;
   p->pid = nextpid++;
 
+  //weight 값은 프로세스의 실행 순으로 값이 할당되기 때문에
+  //전역변수로 선언한 weight 값으로 생성한 프로세스의 weight 값을 설정해주고,
+  //++연산을 통해 전역변수로 선언한 weight 값을 하나 증가시킨다.
+  p->weight = weight++;
+  //초기 priority 값은 현재 ptable에 존재하는 프로세스 중 RUNNABLE 상태인 프로세스들의 가장 작은 priority 값이다.
+  //따라서 ptable에 저장한 현재 가장 작은 priority 값을 전달받은 프로세스의 priority 값으로 업데이트해주는
+  //assign_lowest_priority 함수를 호출해준다.
+  assign_lowest_priority(p);
+
+
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -122,6 +222,11 @@ userinit(void)
 {
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
+
+  //user process가 맨처음 실행되면 호출되는 함수이다.
+  //맨처음 가장 낮은 priority 값은 3으로 설정해주어야 한다.
+  //따라서 가장 낮은 priority 값을 관리하고 있는 lowest_priority 변수에 3을 할당해준다.
+  ptable.lowest_priority = 3;
 
   p = allocproc();
   
@@ -199,7 +304,6 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
-  np->trace_mask = curproc->trace_mask;
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -292,6 +396,7 @@ wait(void)
         p->kstack = 0;
         freevm(p->pgdir);
         p->pid = 0;
+        p->weight = 0;
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
@@ -323,7 +428,7 @@ wait(void)
 void
 scheduler(void)
 {
-  struct proc *p;
+  struct proc *p; 
   struct cpu *c = mycpu();
   c->proc = 0;
   
@@ -333,26 +438,37 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
+    //ssu_schedule 함수는 현재 ptable의 RUNNABLE 프로세스 중 가장 낮은 priority 값을 
+    //갖고 있는 프로세스를 반환한다.
+    //반환받은 프로세스가 우선순위가 가장 높다는 뜻이니 다음 실행시킬 프로세스이다. 
+    p = ssu_schedule();
+    if(p==NULL){
+      release(&ptable.lock);
+      continue;
+    }
 
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
+    c->proc = p;
+    switchuvm(p);
+    p->state = RUNNING;
+
+    swtch(&(c->scheduler), p->context);
+    switchkvm();
+   
+    //프로세스를 실행한 다음 new_priority = old_priority + (time_slice / weight)
+    //규칙으로 프로세스의 priority 값을 업데이트 시킨다.
+    update_priority(p);  
+    //현재 프로세스의 priority 값을 업데이트시켜 값이 변했으므로 현재 RUNNABLE 상태인 프로세스의 priority 값 중
+    //가장 작은 값인 lowest_priority 값 또한 업데이트 시킨다.
+    update_lowest_priority();
+ 
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
-      c->proc = 0;
-    }
-    release(&ptable.lock);
 
+      
+    c->proc = 0;
+    release(&ptable.lock);
   }
 }
 
@@ -460,9 +576,13 @@ wakeup1(void *chan)
 {
   struct proc *p;
 
+  //sleep에서 wakeup 한 시 프로세스의 상태가 SLEEPING에서 RENNABLE 상태가 되면
+  //priority 값은 lowest_priority 값으로 업데이트해준다.
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+    if(p->state == SLEEPING && p->chan == chan){
       p->state = RUNNABLE;
+      assign_lowest_priority(p);
+    }
 }
 
 // Wake up all processes sleeping on chan.
