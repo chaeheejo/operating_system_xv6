@@ -2,6 +2,7 @@
 
 ## OS summary
 1. [OS structures](https://blog.naver.com/60cogml/222907247735)
+2. [Processes](https://blog.naver.com/60cogml/222907325011)
 
 <br/>
 
@@ -40,7 +41,7 @@ ssu_trace [mask] [command]
 <br/>
 
 ## 3rd  
-> priority 기반 스케줄링 
+> priority 기반 스케줄링 구현
 
 <br/>
 
