@@ -1,5 +1,10 @@
 # operating_system with XV6
 
+## OS summary
+1. [OS structures](https://blog.naver.com/60cogml/222907247735)
+
+<br/>
+
 ## 1st
 > xv6 운영체제에 쉘 프로그램 추가
 
