@@ -6,6 +6,7 @@
 1. [OS structures](https://blog.naver.com/60cogml/222907247735)
 2. [Processes](https://blog.naver.com/60cogml/222907325011)
 3. [CPU Scehduling](https://blog.naver.com/60cogml/222908075665)
+4. [Main Memory](https://blog.naver.com/60cogml/222908604801)
 
 <br/>
 
