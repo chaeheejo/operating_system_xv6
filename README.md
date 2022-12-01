@@ -7,6 +7,7 @@
 3. [CPU Scehduling](https://blog.naver.com/60cogml/222908075665)
 4. [Main Memory](https://blog.naver.com/60cogml/222908604801)
 5. [Virtual Memory 1/2](https://blog.naver.com/60cogml/222942484600)
+6. [Virtual Memory 2/2](https://blog.naver.com/60cogml/222943342029)
 
 <br/>
 
